@@ -67,6 +67,10 @@ private:
         numRecords += 1;
     }
 
+    int hash(int id, int i) {
+        return id % int(pow(2,i));
+    }
+
 public:
     LinearHashIndex(string indexFileName) {
         numBlocks = 0;
