@@ -29,8 +29,9 @@ public:
         return 16 + name.length() + bio.length();
     }
 
+    // Does not write endl or delimiter of any kind
     void write(fstream &ouput_file){
-        ouput_file << id << "," << name << "," << bio << "," << manager_id << endl;
+        ouput_file << id << "," << name << "," << bio << "," << manager_id;
     }
 };
 
@@ -51,7 +52,7 @@ private:
 
     // Insert new record into index
     void insertRecord(Record record) {
-
+        
         // No records written to index yet
         if (numRecords == 0) {
             // Initialize index with first blocks (start with 2)
@@ -63,7 +64,7 @@ private:
 
         // Take neccessary steps if capacity is reached
 
-
+        numRecords += 1;
     }
 
 public:
