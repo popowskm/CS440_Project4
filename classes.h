@@ -159,17 +159,19 @@ private:
 
             nextFreePage = 2;
             numBlocks = 2;
+            i = 1;
         }
 
         // Add record to the index in the correct block, creating overflow block if necessary
         int hash = hash_id(record.id, i);
+        int location = hash * PAGE_SIZE;
         
-        index_file.seekg(0);
+        index_file.seekg(location);
         block1.from_file(index_file);
         if (block1.space() > record.size() + 1) {
             block1.add_record(record);
         }
-        index_file.seekg(0);
+        index_file.seekg(location);
         block1.write_block(index_file);
         // Take neccessary steps if capacity is reached
 
