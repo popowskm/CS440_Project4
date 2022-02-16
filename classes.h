@@ -99,10 +99,35 @@ public:
         }
     }
 
+    void set_overflow(int o) {
+        overflow = o;
+    }
+
+    int get_overflow() {
+        return overflow;
+    }
+
     void add_record(Record r) {
         free_space -= r.size() + 4;
         numrecords += 1;
         records.push_back(r);
+    }
+
+    Record id_match(int id, fstream &file) {
+        for (Record temp: records) {
+            if (temp.id == id) {
+                return temp;
+            }
+        }
+        if(overflow != 0) {
+            Block b;
+            b.from_file(overflow, file);
+            return b.id_match(id, file);
+        }
+        else {
+            Record r("0,0,0,0");
+            return r;
+        }
     }
 
     void print() {
@@ -141,7 +166,7 @@ private:
 
     vector<int> pageDirectory;  // Where pageDirectory[h(id)] gives page index of block
                                 // can scan to pages using index*PAGE_SIZE as offset (using seek function)
-    int numBlocks; // n
+    int numBlocks; // Number of buckets, doesn't include overflow blocks
     int i;
     int numRecords; // Records in index
     int nextFreePage; // Next page to write to
@@ -165,24 +190,43 @@ private:
         }
 
         // Add record to the index in the correct block, creating overflow block if necessary
-        int hash = hash_id(record.id, i);
+        int hash = hash_id(record.id);
         
         block1.from_file(hash, index_file);
         if (block1.space() > record.size() + 1) {
             block1.add_record(record);
         }
         block1.write_block(hash, index_file);
+
+        // TODO
+        // Check capacity
         // Take neccessary steps if capacity is reached
-        // Case for when just n increases
+
         // Case for when i increases
+            // ??? maybe we need to parse the whole doc for new hashes now that we look at more bits?
+            // Same as stuff for n
+
+        // Case for when just n increases
+            // Increases blocks by 1
+            // Check block + potential overflow blocks for records with ids that were bitflipped
+            // Migrate relevant records
+            // Write new blocks out
+
 
 
         numRecords += 1;
     }
 
+    // Creates overflow block at next free page and returns that position to pass into overflow
+    int generate_overflow(Block b, fstream &file) {
+        b.write_block(nextFreePage, file);
+        nextFreePage += 1;
+        return nextFreePage - 1;
+    }
+
     // Starts on the right with LSB
-    int hash_id(int id, int j) {
-        return id % int(pow(2,j));
+    int hash_id(int id) {
+        return id % int(pow(2,i));
     }
 
     
@@ -217,12 +261,20 @@ public:
             }
         }
         
-
+        input_file.close();
 
     }
 
     // Given an ID, find the relevant record and print it
-    // Record findRecordById(int id) {
-        
-    // }
+    Record findRecordById(int id) {
+        int page = pageDirectory[hash_id(id)];
+        Block b;
+        fstream index_file;
+        index_file.open(fName, fstream::in | fstream::out);
+        b.from_file(page, index_file);
+
+        Record match("0,0,0,0");
+        match = b.id_match(id, index_file);
+        return match;
+    }
 };
