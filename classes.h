@@ -68,12 +68,13 @@ public:
     }
 
     // Generates block from current position in file by reading and parsing a page of chars
-    void from_file(fstream &file){
+    void from_file(int pos, fstream &file){
         free_space = PAGE_SIZE - 1;
         numrecords = 0;
         overflow = 0;
 
         string input, r;
+        file.seekg(pos * PAGE_SIZE);
         getline(file, input, '\n');
         stringstream s(input);
 
@@ -112,7 +113,8 @@ public:
     }
 
     // Pads to page size with asterisks. Delimits with $. Assumes data fits in block.
-    void write_block(fstream &file) {
+    void write_block(int pos, fstream &file) {
+        file.seekg(pos * PAGE_SIZE);
         for (Record item: records) {
             item.write(file);
             file << '$';
@@ -149,13 +151,13 @@ private:
     void insertRecord(Record record) {
         fstream index_file;
         index_file.open(fName, fstream::in | fstream::out);
-        Block block1, block2;
+        Block block1, block2, block3;
 
         // No records written to index yet
         if (numRecords == 0) {
             // Initialize index with first blocks (start with 2)
-            block1.write_block(index_file);
-            block2.write_block(index_file);
+            block1.write_block(0, index_file);
+            block1.write_block(1, index_file);
 
             nextFreePage = 2;
             numBlocks = 2;
@@ -164,16 +166,16 @@ private:
 
         // Add record to the index in the correct block, creating overflow block if necessary
         int hash = hash_id(record.id, i);
-        int location = hash * PAGE_SIZE;
         
-        index_file.seekg(location);
-        block1.from_file(index_file);
+        block1.from_file(hash, index_file);
         if (block1.space() > record.size() + 1) {
             block1.add_record(record);
         }
-        index_file.seekg(location);
-        block1.write_block(index_file);
+        block1.write_block(hash, index_file);
         // Take neccessary steps if capacity is reached
+        // Case for when just n increases
+        // Case for when i increases
+
 
         numRecords += 1;
     }
