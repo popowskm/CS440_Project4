@@ -79,6 +79,7 @@ public:
 
         while (true) {
             if(getline(s, r, '$')) {
+                // Checks for '*' in string and sets
                 if (r.find('*', 0) != string::npos) {
                     overflow = r[0] - '0';
                     break;
@@ -119,7 +120,7 @@ public:
 
         file << overflow;
         
-        for (int j = 0; j < free_space - 1; j++) {
+        for (int j = 0; j < free_space - to_string(overflow).length(); j++) {
             file << '*';
         }
         file << '\n' << flush;
