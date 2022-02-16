@@ -79,21 +79,16 @@ public:
 
         while (true) {
             if(getline(s, r, '$')) {
-                if (r[0] == '*') {
+                if (r.find('*', 0) != string::npos) {
+                    overflow = r[0] - '0';
                     break;
                 }
-                if (r.length() > 16) {
-                    Record temp(r);
-                    
-                    free_space -= r.length() + 1;
-                    numrecords += 1;
+                Record temp(r);
+                
+                free_space -= r.length() + 1;
+                numrecords += 1;
 
-                    records.push_back(temp);
-                }
-                else {
-                    overflow = stoi(r);
-                    free_space -= r.length();
-                }
+                records.push_back(temp);
             }
             else {
                 break;
@@ -103,9 +98,16 @@ public:
     }
 
     void add_record(Record r) {
-        free_space -= r.size() + 1;
+        free_space -= r.size() + 4;
         numrecords += 1;
-        
+        records.push_back(r);
+    }
+
+    void print() {
+        for (Record r: records) {
+            r.print();
+            cout << endl;
+        }
     }
 
     // Pads to page size with asterisks. Delimits with $. Assumes data fits in block.
@@ -115,6 +117,8 @@ public:
             file << '$';
         }
 
+        file << overflow;
+        
         for (int j = 0; j < free_space - 1; j++) {
             file << '*';
         }
@@ -166,7 +170,6 @@ private:
         }
         index_file.seekg(0);
         block1.write_block(index_file);
-
         // Take neccessary steps if capacity is reached
 
         numRecords += 1;
