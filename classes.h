@@ -18,6 +18,20 @@ public:
         manager_id = stoi(fields[3]);
     }
 
+    Record(string raw) {
+        string word;
+        stringstream  s(raw);
+
+        getline(s, word, ',');
+        id = stoi(word);
+        getline(s, word, ',');
+        name = word;
+        getline(s, word, ',');
+        bio = word;
+        getline(s, word, ',');
+        manager_id = stoi(word);
+    }
+
     void print() {
         cout << "\tID: " << id << "\n";
         cout << "\tNAME: " << name << "\n";
@@ -35,6 +49,83 @@ public:
     }
 };
 
+class Block {
+
+private:
+    const int PAGE_SIZE = 4096;
+    vector<Record> records;
+    int free_space;
+    int numrecords;
+    int overflow;
+
+
+public:
+    // Generates empty block
+    Block() {
+        free_space = PAGE_SIZE - 1; // Bytes of data free in block
+        numrecords = 0; // Number of records in block
+        overflow = 0; // Location of overflow block in index
+    }
+
+    // Generates block from current position in file by reading and parsing a page of chars
+    void from_file(fstream &file){
+        free_space = PAGE_SIZE - 1;
+        numrecords = 0;
+        overflow = 0;
+
+        string input, r;
+        getline(file, input, '\n');
+        stringstream s(input);
+
+        while (true) {
+            if(getline(s, r, '$')) {
+                if (r[0] == '*') {
+                    break;
+                }
+                if (r.length() > 16) {
+                    Record temp(r);
+                    
+                    free_space -= r.length() + 1;
+                    numrecords += 1;
+
+                    records.push_back(temp);
+                }
+                else {
+                    overflow = stoi(r);
+                    free_space -= r.length();
+                }
+            }
+            else {
+                break;
+            }
+
+        }
+    }
+
+    void add_record(Record r) {
+        free_space -= r.size() + 1;
+        numrecords += 1;
+        
+    }
+
+    // Pads to page size with asterisks. Delimits with $. Assumes data fits in block.
+    void write_block(fstream &file) {
+        for (Record item: records) {
+            item.write(file);
+            file << '$';
+        }
+
+        for (int j = 0; j < free_space - 1; j++) {
+            file << '*';
+        }
+        file << '\n' << flush;
+    }
+
+    int space() {
+        return free_space;
+    }
+};
+
 
 class LinearHashIndex {
 
@@ -47,36 +138,52 @@ private:
     int i;
     int numRecords; // Records in index
     int nextFreePage; // Next page to write to
-    int block_size;
     string fName;
 
     // Insert new record into index
     void insertRecord(Record record) {
-        
+        fstream index_file;
+        index_file.open(fName, fstream::in | fstream::out);
+        Block block1, block2;
+
         // No records written to index yet
         if (numRecords == 0) {
             // Initialize index with first blocks (start with 2)
+            block1.write_block(index_file);
+            block2.write_block(index_file);
 
+            nextFreePage = 2;
+            numBlocks = 2;
         }
 
         // Add record to the index in the correct block, creating overflow block if necessary
-
+        int hash = hash_id(record.id, i);
+        
+        index_file.seekg(0);
+        block1.from_file(index_file);
+        if (block1.space() > record.size() + 1) {
+            block1.add_record(record);
+        }
+        index_file.seekg(0);
+        block1.write_block(index_file);
 
         // Take neccessary steps if capacity is reached
 
         numRecords += 1;
     }
 
-    int hash(int id, int i) {
-        return id % int(pow(2,i));
+    // Starts on the right with LSB
+    int hash_id(int id, int j) {
+        return id % int(pow(2,j));
     }
+
+    
 
 public:
     LinearHashIndex(string indexFileName) {
         numBlocks = 0;
         i = 0;
         numRecords = 0;
-        block_size = 0;
         fName = indexFileName;
     }
 
@@ -92,18 +199,9 @@ public:
             
             if (getline(input_file, line, '\n'))
             {
-                stringstream  s(line);
-
-                getline(s, word, ',');
-                components.push_back(word);
-                getline(s, word, ',');
-                components.push_back(word);
-                getline(s, word, ',');
-                components.push_back(word);
-                getline(s, word, ',');
-                components.push_back(word);
-                Record r(components);
+                Record r(line);
                 insertRecord(r);
+
             }
             else
             {
@@ -116,7 +214,7 @@ public:
     }
 
     // Given an ID, find the relevant record and print it
-    Record findRecordById(int id) {
+    // Record findRecordById(int id) {
         
-    }
+    // }
 };
