@@ -147,21 +147,14 @@ public:
         return make_tuple(output, overflow);
     }
 
-    Record id_match(int id, fstream &file) {
+    tuple<Record, int> id_match(int id, fstream &file) {
         for (Record temp: records) {
             if (temp.id == id) {
-                return temp;
+                return make_tuple(temp, overflow);
             }
         }
-        if(overflow != 0) {
-            Block b;
-            b.from_file(overflow, file);
-            return b.id_match(id, file);
-        }
-        else {
-            Record r("0,0,0,0");
-            return r;
-        }
+        Record r("0,0,0,0");
+        return make_tuple(r, overflow);
     }
 
     void print() {
@@ -353,22 +346,22 @@ public:
             }
             else
             {
-                Block block1;
-                for (int j = 0; j < 13; j++) {
-                    fstream index;
-                    index.open("EmployeeIndex", fstream::in);
-                    block1.from_file(j, index);
-                    vector<Record> records = block1.get_records();
-                    for (Record r: records) {
-                        cout << hash_id(r.id) << ',';
-                    }
-                    cout << endl;
-                }
-                input_file.close();
-                for (int j: pageDirectory) {
-                    cout<< j << ',';
-                }
-                cout << endl;
+                // Block block1;
+                // for (int j = 0; j < 13; j++) {
+                //     fstream index;
+                //     index.open("EmployeeIndex", fstream::in);
+                //     block1.from_file(j, index);
+                //     vector<Record> records = block1.get_records();
+                //     for (Record r: records) {
+                //         cout << hash_id(r.id) << ',';
+                //     }
+                //     cout << endl;
+                // }
+                // input_file.close();
+                // for (int j: pageDirectory) {
+                //     cout<< j << ',';
+                // }
+                // cout << endl;
                 break;
             }
         }
@@ -377,14 +370,32 @@ public:
 
     // Given an ID, find the relevant record and print it
     Record findRecordById(int id) {
-        int page = pageDirectory[hash_id(id)];
+        int hash = hash_id(id);
+        if (hash > numBlocks - 1) {
+            hash = hash - pow(2,(i-1));
+        }
+        int page = pageDirectory[hash];
         Block b;
         fstream index_file;
         index_file.open(fName, fstream::in | fstream::out);
-        b.from_file(page, index_file);
-
         Record match("0,0,0,0");
-        match = b.id_match(id, index_file);
+
+        while (true) {
+            b.from_file(page, index_file);
+
+            tuple<Record, int> match_overflow = b.id_match(id, index_file);
+
+            int overflow = get<1>(match_overflow);
+            match = get<0>(match_overflow);
+
+            if(overflow == 0 || match.name != "0") {
+                break;
+            }
+            else {
+                page = overflow;
+            }
+
+        }
         return match;
     }
 };

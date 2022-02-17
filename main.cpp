@@ -40,7 +40,13 @@ int main(int argc, char* const argv[]) {
         }
         else
         {
-            emp_index.findRecordById(stoi(input)).print();
+            Record temp = emp_index.findRecordById(stoi(input));
+            if (temp.name == "0"){
+                cout << "No match found" << endl;
+            }
+            else {
+                temp.print();
+            }
         }
     }
     
