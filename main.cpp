@@ -19,6 +19,10 @@ using namespace std;
 int main(int argc, char* const argv[]) {
 
     // Create the index
+    ofstream temp;
+    temp.open("EmployeeIndex");
+    temp << ' ';
+    temp.close();
     
     LinearHashIndex emp_index("EmployeeIndex");
     emp_index.createFromFile("Employee.csv");
