@@ -72,6 +72,7 @@ public:
         free_space = PAGE_SIZE - 1;
         numrecords = 0;
         overflow = 0;
+        records.clear();
 
         string input, r;
         file.seekg(pos * PAGE_SIZE);
@@ -82,7 +83,13 @@ public:
             if(getline(s, r, '$')) {
                 // Checks for '*' in string and sets
                 if (r.find('*', 0) != string::npos) {
-                    overflow = r[0] - '0';
+                    string over;
+                    for (char c: r) {
+                        if (c != '*') {
+                            over += c;
+                        }
+                    }
+                    overflow = stoi(over);
                     break;
                 }
                 Record temp(r);
@@ -113,6 +120,7 @@ public:
         records.push_back(r);
     }
 
+    // 
     Record id_match(int id, fstream &file) {
         for (Record temp: records) {
             if (temp.id == id) {
@@ -187,24 +195,60 @@ private:
             nextFreePage = 2;
             numBlocks = 2;
             i = 1;
+            pageDirectory.push_back(0);
+            pageDirectory.push_back(1);
         }
 
         // Add record to the index in the correct block, creating overflow block if necessary
         int hash = hash_id(record.id);
-        
-        block1.from_file(hash, index_file);
-        if (block1.space() > record.size() + 1) {
-            block1.add_record(record);
+        // bitflip
+        if (hash > numBlocks) {
+            hash = hash - pow(2,(i-1));
         }
-        block1.write_block(hash, index_file);
+
+        int location = pageDirectory[hash];
+        while (true) {
+            block1.from_file(location, index_file);
+            if (block1.space() > record.size() + 1) {
+                // Add block to record, write and break
+                block1.add_record(record);
+                block1.write_block(location, index_file);
+                break;
+            }
+            else {
+                // Set location to overflow position and loop
+                if (block1.get_overflow() > 0) {
+                    location = block1.get_overflow();
+                }
+                else {
+                    // Create overflow block, set overflow of previous block, write and break
+                    block1.set_overflow(generate_overflow(block2, index_file));
+                    block1.write_block(location, index_file);
+                    block2.add_record(record);
+                    block2.write_block(block1.get_overflow(), index_file);
+                    break;
+                }
+            }
+        }
 
         // TODO
         // Check capacity
-        // Take neccessary steps if capacity is reached
+        // assume 70% capacity of a block is 4 records
+        if (numRecords >= (4 * numBlocks)) {
+            // increment n
+            //      create new block
+            //      reshuffle?
+            numBlocks += 1;
+            block3.write_block(nextFreePage, index_file);
+            pageDirectory.push_back(nextFreePage);
+            nextFreePage += 1;
 
-        // Case for when i increases
-            // ??? maybe we need to parse the whole doc for new hashes now that we look at more bits?
-            // Same as stuff for n
+            // increment i bc numBlocks reached capacity
+            if (numBlocks == pow(2,1)) {
+                i += 1;
+            }    
+        }
+        // Take neccessary steps if capacity is reached
 
         // Case for when just n increases
             // Increases blocks by 1
