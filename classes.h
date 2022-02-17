@@ -4,6 +4,8 @@
 #include <iostream>
 #include <sstream>
 #include <bitset>
+#include <tuple>
+#include <algorithm>
 using namespace std;
 
 class Record {
@@ -67,6 +69,10 @@ public:
         overflow = 0; // Location of overflow block in index
     }
 
+    vector<Record> get_records() {
+        return records;
+    }
+
     // Generates block from current position in file by reading and parsing a page of chars
     void from_file(int pos, fstream &file){
         free_space = PAGE_SIZE - 1;
@@ -120,7 +126,27 @@ public:
         records.push_back(r);
     }
 
-    // 
+    tuple<vector<Record>, int> remove_bitflips(int blocks, int digit, fstream &file) {
+        vector<Record> output;
+        int counter = 0;
+        vector<int> duplicates;
+        for (Record temp: records) {
+            // cout << temp.id % int(pow(2, digit)) << endl;
+            if (temp.id % int(pow(2,digit)) == blocks - 1) {
+                output.push_back(temp);
+                duplicates.push_back(counter);
+            }
+            counter += 1;
+        }
+        reverse(duplicates.begin(), duplicates.end());
+        for (int j: duplicates) {
+            free_space +=  records[j].size() + 4;
+            records.erase(records.begin() + j);
+        }
+        // cout << endl;
+        return make_tuple(output, overflow);
+    }
+
     Record id_match(int id, fstream &file) {
         for (Record temp: records) {
             if (temp.id == id) {
@@ -179,9 +205,11 @@ private:
     int numRecords; // Records in index
     int nextFreePage; // Next page to write to
     string fName;
+    int size_of_records;
 
     // Insert new record into index
     void insertRecord(Record record) {
+        size_of_records += record.size();
         fstream index_file;
         index_file.open(fName, fstream::in | fstream::out);
         Block block1, block2, block3;
@@ -202,7 +230,7 @@ private:
         // Add record to the index in the correct block, creating overflow block if necessary
         int hash = hash_id(record.id);
         // bitflip
-        if (hash > numBlocks) {
+        if (hash > numBlocks - 1) {
             hash = hash - pow(2,(i-1));
         }
 
@@ -230,23 +258,47 @@ private:
                 }
             }
         }
-
+        numRecords += 1;
         // TODO
         // Check capacity
-        // assume 70% capacity of a block is 4 records
-        if (numRecords >= (4 * numBlocks)) {
+        // average capacity = num records / (num blocks * # of records that fit in a block)
+        if ((size_of_records / (numBlocks * PAGE_SIZE)) > 0.7) {
             // increment n
-            //      create new block
-            //      reshuffle?
+            //  create new block
             numBlocks += 1;
             block3.write_block(nextFreePage, index_file);
             pageDirectory.push_back(nextFreePage);
             nextFreePage += 1;
 
             // increment i bc numBlocks reached capacity
-            if (numBlocks == pow(2,1)) {
+            if (numBlocks - 1 == pow(2,i)) {
                 i += 1;
-            }    
+            }
+            // get bitflipped records that are now misplaced due to existance of new block
+            location = pageDirectory[numBlocks - 1 - int(pow(2,i-1))];
+            block1.from_file(location, index_file);
+            while (true) {
+                tuple<vector<Record>, int> misplaced = block1.remove_bitflips(numBlocks, i, index_file);
+                
+                // Separate tuple
+                vector<Record> new_records = get<0>(misplaced);
+                int overflow = get<1>(misplaced);
+                
+                block1.write_block(location, index_file);
+
+                for (Record r: new_records) {
+                    block3.add_record(r);
+                }
+                if (overflow > 0) {
+                    block1.from_file(overflow, index_file);
+                    location = overflow;
+                }
+                else {
+                    break;
+                }
+            }
+            block3.write_block(nextFreePage - 1, index_file);
+
         }
         // Take neccessary steps if capacity is reached
 
@@ -256,9 +308,8 @@ private:
             // Migrate relevant records
             // Write new blocks out
 
+        
 
-
-        numRecords += 1;
     }
 
     // Creates overflow block at next free page and returns that position to pass into overflow
@@ -281,6 +332,7 @@ public:
         i = 0;
         numRecords = 0;
         fName = indexFileName;
+        size_of_records = 0;
     }
 
     // Read csv file and add records to the index
@@ -301,11 +353,25 @@ public:
             }
             else
             {
+                Block block1;
+                for (int j = 0; j < 13; j++) {
+                    fstream index;
+                    index.open("EmployeeIndex", fstream::in);
+                    block1.from_file(j, index);
+                    vector<Record> records = block1.get_records();
+                    for (Record r: records) {
+                        cout << hash_id(r.id) << ',';
+                    }
+                    cout << endl;
+                }
+                input_file.close();
+                for (int j: pageDirectory) {
+                    cout<< j << ',';
+                }
+                cout << endl;
                 break;
             }
         }
-        
-        input_file.close();
 
     }
 
